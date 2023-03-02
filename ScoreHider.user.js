@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AOTY Score Hider
 // @namespace    http://tampermonkey.net/
-// @version      0.9
+// @version      0.9.1
 // @description  Script to hide album ratings on AOTY (albumoftheyear) to not change opinions on albums before listening.
 // @author       You
 // @match        https://www.albumoftheyear.org/*
@@ -14,54 +14,6 @@
 // ==/UserScript==
 (function () {
     let settingsButton;
-
-    function getElementByXpath(path) {
-        return document.evaluate(
-            path,
-            document,
-            null,
-            XPathResult.FIRST_ORDERED_NODE_TYPE,
-            null
-        ).singleNodeValue;
-    }
-
-    function getDomPath(el) {
-        if (!el) {
-            return;
-        }
-        var stack = [];
-        var isShadow = false;
-        while (el.parentNode != null) {
-            var sibCount = 0;
-            var sibIndex = 0;
-            for (var i = 0; i < el.parentNode.childNodes.length; i++) {
-                var sib = el.parentNode.childNodes[i];
-                if (sib.nodeName == el.nodeName) {
-                    if (sib === el) {
-                        sibIndex = sibCount;
-                    }
-                    sibCount++;
-                }
-            }
-            var nodeName = el.nodeName.toLowerCase();
-            if (isShadow) {
-                nodeName += "::shadow";
-                isShadow = false;
-            }
-            if (sibCount > 1) {
-                stack.unshift(nodeName + ":nth-of-type(" + (sibIndex + 1) + ")");
-            } else {
-                stack.unshift(nodeName);
-            }
-            el = el.parentNode;
-            if (el.nodeType === 11) {
-                isShadow = true;
-                el = el.host;
-            }
-        }
-        stack.splice(0, 1);
-        return stack.join(" > ");
-    }
     GM_config.init({
         id: "NoScores",
         fields: {
