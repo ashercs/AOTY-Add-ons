@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         AOTY Add-ons
 // @namespace    https://albumoftheyear.org
-// @version      0.1
-// @description  try to take over the world!
+// @version      0.4.1
+// @description  A few different AOTY extensions I made compiled together.
 // @author       You
 // @require      http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js
 // @require      https://openuserjs.org/src/libs/sizzle/GM_config.js
@@ -112,6 +112,16 @@
                 type: "float",
                 default: 220,
             },
+            AARating: {
+                section: [
+                    GM_config.create("Artist Rating Viewer"),
+                    "Script that automatically calculates a user or critics average rating of an artist when viewed.",
+                ],
+                options: ["On", "Off"],
+                label: "Toggle Artist Rating Viewer",
+                type: "radio",
+                default: "On",
+            },
         },
         css: "#AOTY-Addons { height: 200px; width: 500px }",
     });
@@ -154,7 +164,6 @@
             var innerDoc = iframe.contentDocument || iframe.contentWindow.document;
             if (innerDoc.getElementById('AOTY-Addons_section_desc_3')) {
                 if (!innerDoc.getElementById('AOTY-Addons_section_desc_3').innerHTML.includes('href="https://pastebin.com/raw/PehxkCSw')) {
-                    console.log('hello')
                     innerDoc.getElementById('AOTY-Addons_section_desc_3').innerHTML =
                         `Script to pick a random rated album from you (or anyone's) rated albums page.` +
                         `</p><a>Full guide: </a>` +
@@ -209,6 +218,7 @@
     let TBMinScore = GM_config.get("THMinScore")
     let TBMinRatings = GM_config.get("THMinRatings")
     let RAEnabled = GM_config.get("RAEnable")
+    let AARating = GM_config.get("AARating")
     let RAKeyBind = GM_config.get("RAKeyBind")
 
     if (TBEnabled == "On") {
@@ -216,7 +226,6 @@
             if (document.getElementsByClassName("trackRating").length > 0) {
                 let tracklist = document.getElementsByClassName("trackRating");
                 for (let i = 0; tracklist.length > i; i++) {
-                    console.log(i + 1);
                     let rating = tracklist[i].children[0].textContent;
                     let ratingcount = tracklist[i].children[0]
                         .getAttribute("title")
@@ -225,8 +234,6 @@
                         let track =
                             document.getElementsByClassName("trackTitle")[i].children[0];
                         track.style.fontWeight = "bold";
-                        // track.style.background = "rgba(124, 252, 0, .1)"
-                        // track.style.color = 'black'
                     }
                 }
             }
@@ -389,19 +396,14 @@
             }
         }
         if (url.startsWith("https://www.albumoftheyear.org/artist/")) {
-            // Checking elements
             let truescore = document.getElementsByClassName("trackListTable large")[0]
                 .children[0];
             for (let i = 0; i < truescore.children.length; i++) {
                 let score = truescore.children[i].children[3].children[0];
                 score.textContent = round(score.getAttribute("title"), RSRound2);
-                console.log(
-                    truescore.children[i].children[3].children[0].getAttribute("title")
-                );
             }
         }
         if (url.startsWith("https://www.albumoftheyear.org/ratings/")) {
-            // Checking elements
             let roundedscore = document.getElementsByClassName("scoreValue");
             let truescore = document.getElementsByClassName("scoreValueContainer");
             let check = document.getElementsByClassName("scoreHeader");
@@ -413,7 +415,7 @@
                 ) {
                     roundedscore[i].textContent = round(
                         truescore[i].getAttribute("title"),
-                        RSRound1
+                        RSRound2
                     );
                     roundedscore[i].style.fontSize = `${RSFontSize2}px`;
                 }
@@ -424,13 +426,12 @@
         if (url.includes('https://www.albumoftheyear.org/user/') && url.includes('/ratings')) {
             function doc_keyUp(e) {
                 switch (e.keyCode) {
-                    case 220:
+                    case RAKeyBind:
                         let url = window.location.href;
                         GM_setValue("first", false);
                         if (url.endsWith("/ratings/1/") || url.endsWith("/ratings/")) {
                             GM_setValue("first", true);
                         }
-                        console.log(GM_getValue("first"));
                         if (GM_getValue("first") == true) {
                             let pagenumbers =
                                 document.getElementsByClassName("pageSelectSmall")[
@@ -460,5 +461,58 @@
             }
             document.addEventListener("keyup", doc_keyUp, false);
         }
+    }
+    if (AARating == "On") {
+        let ok = false
+        let total = 0
+        let thingtest;
+        let albsrated = 0
+        const Observe = (sel, opt, cb) => {
+            const Obs = new MutationObserver((m) => [...m].forEach(cb));
+            document.querySelectorAll(sel).forEach(el => Obs.observe(el, opt));
+        };
+        if (document.querySelector("#graybg > span > div.footer > div.overlay")) {
+        thingtest = "#graybg > span > div.footer > div.overlay"
+        }
+        if (document.querySelector("#graybg > div.footer > div.overlay")) {
+        thingtest = "#graybg > div.footer > div.overlay"
+        }
+
+        Observe(thingtest, {
+            attributesList: ["style"],
+            attributeOldValue: true,
+        }, (m) => {
+            if (m.target.getAttribute(m.attributeName) == "display: block;") {
+                ok = true
+            }
+        });
+        setInterval(() => {
+            if (ok == true && document.getElementsByClassName("albumInfo").length > 0) {
+                for (let i = 0; document.getElementsByClassName("albumInfo").length * 2 > i; i++) {
+                    if (document.getElementsByClassName("tableRating")[i] && document.getElementsByClassName("tableRating")[i].children[0]) {
+                        if (document.getElementsByClassName("tableRating")[i].children[0].className == "green-font" || document.getElementsByClassName("tableRating")[i].children[0].className == "yellow-font" || document.getElementsByClassName("tableRating")[i].children[0].className == "red-font") {
+                            total += Number(document.getElementsByClassName("tableRating")[i].children[0].textContent)
+                            albsrated++
+                        }
+                    }
+                }
+                let artistratings = document.getElementsByClassName("subHeadline artistRatings")[0]
+                let avgscore = round((total / albsrated), 2)
+                let color;
+                if (avgscore >= 69.5) {
+                    color = "#85ce73"
+                }
+                if (avgscore < 69 && avgscore >= 49.5) {
+                    color = "#f0e68c"
+                }
+                if (avgscore < 49.5) {
+                    color = "#d76666"
+                }
+                artistratings.innerHTML += `<span style="font-size: 17.6px; font-weight: 400;"><br>Average Artist Rating: <span style="color: ${color}; font-weight: bold;">${round((total / albsrated), 2)}</span></br></span>`
+                total = 0
+                albsrated = 0
+                ok = false
+            }
+        }, 100);
     }
 })();
