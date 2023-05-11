@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         AOTY Add-ons
 // @namespace    https://albumoftheyear.org
-// @version      0.8.6
+// @version      0.8.7
 // @description  A few different AOTY extensions I made compiled together.
-// @author       Rice
+// @author       You
 // @require      http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js
 // @require      https://openuserjs.org/src/libs/sizzle/GM_config.js
 // @require      https://greasyfork.org/scripts/421384-gm-fetch/code/GM_fetch.js?version=1134973
@@ -89,7 +89,7 @@
                     "If tracks are above a certain score with a certain amount of ratings they will be bolded.",
                 ],
                 options: ["On", "Off"],
-                label: "Toggle Score Hider",
+                label: "Toggle Track Highlighter",
                 type: "radio",
                 default: "On",
             },
@@ -397,7 +397,7 @@
     let betterLengths = GM_config.get('betterLengths')
     let checkUrl = GM_config.get('checkUrl')
 
-    if (TBEnabled == "On") {
+    if (TBEnabled == "On" && HSenabled == "Off") {
         if (url.startsWith("https://www.albumoftheyear.org/album/")) {
             if (document.getElementsByClassName("trackRating").length > 0) {
                 let tracklist = document.getElementsByClassName("trackRating");
@@ -544,12 +544,13 @@
         if (url.startsWith("https://www.albumoftheyear.org/album/")) {
             if (document.getElementsByClassName("albumCriticScore")[0]) {
                 if (
-                    document.getElementsByClassName("albumCriticScore")[0].children[0]
+                    document.getElementsByClassName("albumCriticScore")[0].children[0].children[0]
                     .textContent !== "NR"
                 ) {
                     let criticscore =
-                        document.getElementsByClassName("albumCriticScore")[0].children[0];
-                    let unrounded = criticscore.textContent;
+                        document.getElementsByClassName("albumCriticScore")[0].children[0].children[0];
+                    let unrounded = criticscore.getAttribute('title')
+                    document.getElementsByClassName('albumCriticScore')[0].style.color = '#FFF'
                     if (round(unrounded, RSRound1) > 100) {
                         criticscore.textContent = 100;
                     } else {
@@ -570,6 +571,7 @@
                     userscore.textContent = round(unrounded2, RSRound1);
                     document.getElementsByClassName("albumUserScore")[0].style.fontSize =
                         `${RSFontSize1}px`;
+                    document.getElementsByClassName('albumCriticScore')[0].style.color = '#FFF'
                 }
             }
         }
@@ -694,25 +696,58 @@
         }, 100);
     }
     if (TListSorter == "On") {
-        if (onalbum == "True" || url.includes('https://www.albumoftheyear.org/song/')) {
-            function unselectable(classname) {
-                if (document.getElementById('tracklist').children[0].children[0].innerHTML) {
+        let elemtolookfor;
+        if (url.startsWith('https://www.albumoftheyear.org/song/')) {
+            if (document.getElementsByClassName('section')[2]) {
+                document.getElementsByClassName('section')[2].remove()
+            }
+            elemtolookfor = document.getElementsByClassName('trackList')[0].children[0].children[0]
+        }
+        if (onalbum == "True") {
+            elemtolookfor = document.getElementById('tracklist').children[0].children[0]
+        }
+
+        function unselectable(classname) {
+            if (elemtolookfor.innerHTML) {
+                if (document.getElementsByClassName(classname)[0]) {
                     document.getElementsByClassName(classname)[0].style.MozUserSelect = "-moz-none"
                     document.getElementsByClassName(classname)[0].style.webkitUserSelect = "none"
                     document.getElementsByClassName(classname)[0].style.UserSelect = "none"
                 }
             }
-            if (document.getElementsByClassName('trackRating').length > 0) {
-                let initialinhtml = document.getElementById('tracklist').children[0].children[0].innerHTML
-                let ogtracklist = document.getElementsByClassName('trackList')[0].innerHTML
-                let disclength = document.getElementsByClassName('discNumber').length
-                document.getElementById('tracklist').children[0].children[0].innerHTML += `<br><span class="sorttracklist"; style="font-size: 8px; font-weight: 400; color: lightblue;"> [Sort by highest rated]</span></br>`
-                unselectable("sorttracklist")
-                setInterval(() => {
-                    let sorttracklist = document.getElementsByClassName('sorttracklist')[0]
-                    if (sorttracklist) {
-                        sorttracklist.onclick = () => {
 
+        }
+        if (document.getElementsByClassName('trackRating').length > 0) {
+            let initialinhtml;
+            const disclength = document.getElementsByClassName('discNumber').length
+            if (onalbum == "True") {
+                initialinhtml = document.getElementById('tracklist').children[0].children[0].innerHTML
+                document.getElementById('tracklist').children[0].children[0].innerHTML += `<br><span class="sorttracklist"; style="font-size: 8px; font-weight: 400; color: lightblue;"> [Sort by highest rated]</span></br>`
+            }
+            if (url.startsWith('https://www.albumoftheyear.org/song/')) {
+                initialinhtml = document.getElementsByClassName('sectionHeading')[2].innerHTML
+                document.getElementsByClassName('sectionHeading')[2].innerHTML += `<br><span class="sorttracklist"; style="font-size: 8px; font-weight: 400; color: lightblue;"> [Sort by highest rated]</span></br>`
+            }
+            const ogtracklist = document.getElementsByClassName('trackList')[0].innerHTML
+
+            unselectable("sorttracklist")
+            setInterval(() => {
+                let sorttracklist = document.getElementsByClassName('sorttracklist')[0]
+                if (sorttracklist) {
+                    sorttracklist.onclick = () => {
+
+                        function sortscores(oddeven) {
+                            let evenorodd;
+                            if (oddeven == "Odd") {
+                                evenorodd = function (x) {
+                                    return x & 1;
+                                }
+                            };
+                            if (oddeven == "Even") {
+                                evenorodd = function (x) {
+                                    return !(x & 1);
+                                };
+                            }
                             let arr1 = []
                             let arr2 = []
                             let rateabletrackcount = 0
@@ -726,7 +761,10 @@
                             }
                             if (rateabletrackcount == document.getElementsByClassName('trackRating').length) {
                                 for (let i = 0; i < document.getElementsByClassName('trackRating').length; i++) {
-                                    if (document.getElementsByClassName('trackRating')[i]) {
+                                    if (document.getElementsByClassName('trackRating')[i] && onalbum == "True") {
+                                        arr1.push(document.getElementsByClassName('trackRating')[i].children[0].textContent)
+                                    }
+                                    if (document.getElementsByClassName('trackRating')[i] && evenorodd(i) && url.startsWith('https://www.albumoftheyear.org/song/')) {
                                         arr1.push(document.getElementsByClassName('trackRating')[i].children[0].textContent)
                                     }
                                 }
@@ -737,6 +775,7 @@
                                     arr2.push(i);
                                 };
                                 let arr = arr2;
+                                let disclength = document.getElementsByClassName('discNumber').length
                                 if (disclength > 0) {
                                     for (let i = 0; i < disclength; i++) {
                                         document.getElementsByClassName('discNumber')[0].remove()
@@ -752,86 +791,206 @@
                                     }
                                 }
                                 let wrapper = document.getElementsByClassName("trackListTable");
-                                let items = wrapper[0].children[0].children;
+                                let items;
+                                if (evenorodd(2)) {
+                                    items = wrapper[0].children[0].children;
+                                }
+                                if (evenorodd(1)) {
+                                    items = wrapper[0].children;
+                                }
                                 let items3 = wrapper[0].children
                                 let elements = document.createDocumentFragment();
-
+                                let onsongornot;
+                                if (url.startsWith('https://www.albumoftheyear.org/song/')) {
+                                    elements.appendChild(items[0].cloneNode(true))
+                                    onsongornot = 1
+                                }
+                                if (onalbum == "True") {
+                                    onsongornot = 0
+                                }
                                 arr.forEach(function (idx) {
-                                    if (items[0].getAttribute('class') !== 'trackNumber') {
-                                        elements.appendChild(items[idx].cloneNode(true));
+                                    if (items[onsongornot].getAttribute('class') !== 'trackNumber') {
+                                        if (url.startsWith('https://www.albumoftheyear.org/song/')) {
+                                            elements.appendChild(items[idx + 1].cloneNode(true));
+                                        }
+                                        if (onalbum == "True" && !url.startsWith('https://www.albumoftheyear.org/song/')) {
+                                            elements.appendChild(items[idx].cloneNode(true));
+                                        }
                                     }
-                                    if (items[0].getAttribute('class') == 'trackNumber') {
-                                        elements.appendChild(items3[idx].cloneNode(true));
+                                    if (items[onsongornot].getAttribute('class') == 'trackNumber') {
+                                        if (url.startsWith('https://www.albumoftheyear.org/song/')) {
+                                            elements.appendChild(items3[idx + 1].cloneNode(true));
+                                        }
+                                        if (onalbum == "True") {
+                                            elements.appendChild(items3[idx].cloneNode(true));
+                                        }
                                     }
                                 });
-
                                 wrapper[0].innerHTML = null;
                                 wrapper[0].appendChild(elements);
                             }
-
-                            document.getElementById('tracklist').children[0].children[0].innerHTML = initialinhtml + `<br><span class="sorttracklist2"; style="font-size: 8px; font-weight: 400; color: lightblue;"> [Sort by track number]</span></br>`
-                            unselectable("sorttracklist2")
+                            if (onalbum == "True") {
+                                if (!document.getElementsByClassName('sorttracklist')[0]) {
+                                    elemtolookfor.innerHTML = initialinhtml + `<br><span class="sorttracklist2"; style="font-size: 8px; font-weight: 400; color: lightblue;"> [Sort by track number]</span></br>`
+                                }
+                                if (document.getElementsByClassName('sorttracklist')[0]) {
+                                    document.getElementsByClassName('sorttracklist')[0].parentNode.innerHTML = initialinhtml + `<br><span class="sorttracklist2"; style="font-size: 8px; font-weight: 400; color: lightblue;"> [Sort by track number]</span>`
+                                }
+                                unselectable("sorttracklist2")
+                            }
+                            if (url.startsWith('https://www.albumoftheyear.org/song/')) {
+                                if (document.getElementsByClassName('sorttracklist')[0]) {
+                                    document.getElementsByClassName('sorttracklist')[0].parentNode.innerHTML = initialinhtml + `<br><span class="sorttracklist3"; style="font-size: 8px; font-weight: 400; color: lightblue;"> [Sort by your highest rated]</span>`
+                                }
+                                setInterval(() => {
+                                    if (document.getElementsByClassName('sorttracklist3')[0]) {
+                                        document.getElementsByClassName('sorttracklist3')[0].onclick = () => {
+                                            sortscores("Odd")
+                                            if (document.getElementsByClassName('sorttracklist3')[0]) {
+                                                document.getElementsByClassName('sorttracklist3')[0].parentNode.innerHTML = initialinhtml + `<br><span class="sorttracklist2"; style="font-size: 8px; font-weight: 400; color: lightblue;"> [Sort by track number]</span>`
+                                                unselectable("sorttracklist2")
+                                            }
+                                        }
+                                    }
+                                }, 100);
+                                unselectable("sorttracklist3")
+                            }
                         }
+                        sortscores("Even")
                     }
-                }, 100);
+                }
+            }, 100);
 
-                setInterval(() => {
-                    let unsorttracklist = document.getElementsByClassName('sorttracklist2')[0]
-                    if (unsorttracklist) {
-                        unsorttracklist.onclick = () => {
-                            let arr3 = []
-                            let arr4 = []
-                            for (let i = 0; i < document.getElementsByClassName("trackListTable")[0].children.length; i++) {
-                                arr3.push(document.getElementsByClassName("trackListTable")[0].children[i].children[0].textContent)
-                            }
-                            let elements2 = document.createDocumentFragment();
-                            const deepCopy2 = [...arr3].map((e, i) => [e, i]).sort(function (a, b) {
-                                return b[0] - a[0]
-                            });
-                            for (let [e, i] of deepCopy2) {
-                                arr4.push(i);
-                            };
-                            let wrapper2 = document.getElementsByClassName("trackListTable");
-                            let items2 = wrapper2[0].children;
-                            arr4.reverse().forEach(function (idx) {
-                                elements2.appendChild(items2[idx].cloneNode(true));
-                            });
-                            if (disclength == 0) {
-                                wrapper2[0].innerHTML = null;
-                                wrapper2[0].appendChild(elements2);
-                            }
-                            if (disclength > 0) {
-                                document.getElementsByClassName('trackList')[0].innerHTML = ogtracklist
-                            }
-                            document.getElementById('tracklist').children[0].children[0].innerHTML = initialinhtml + `<br><span class="sorttracklist"; style="font-size: 8px; font-weight: 400; color: lightblue;"> [Sort by highest rated]</span></br>`
-                            unselectable("sorttracklist")
+            setInterval(() => {
+                let unsorttracklist = document.getElementsByClassName('sorttracklist2')[0]
+                if (unsorttracklist) {
+                    unsorttracklist.onclick = () => {
+                        let arr3 = []
+                        let arr4 = []
+                        for (let i = 0; i < document.getElementsByClassName("trackListTable")[0].children.length; i++) {
+                            arr3.push(document.getElementsByClassName("trackListTable")[0].children[i].children[0].textContent)
                         }
+                        let elements2 = document.createDocumentFragment();
+                        const deepCopy2 = [...arr3].map((e, i) => [e, i]).sort(function (a, b) {
+                            return b[0] - a[0]
+                        });
+                        for (let [e, i] of deepCopy2) {
+                            arr4.push(i);
+                        };
+                        let wrapper2 = document.getElementsByClassName("trackListTable");
+                        let items2 = wrapper2[0].children;
+                        arr4.reverse().forEach(function (idx) {
+                            elements2.appendChild(items2[idx].cloneNode(true));
+                        });
+                        if (disclength == 0) {
+                            wrapper2[0].innerHTML = null;
+                            wrapper2[0].appendChild(elements2);
+                        }
+                        if (disclength > 0) {
+                            document.getElementsByClassName('trackList')[0].innerHTML = ogtracklist
+                            if (avgTracklist == "On") {
+                                getAvgTracklist()
+                            }
+                        }
+                        elemtolookfor.innerHTML = initialinhtml + `<br><span class="sorttracklist"; style="font-size: 8px; font-weight: 400; color: lightblue;"> [Sort by highest rated]</span></br>`
+                        unselectable("sorttracklist")
                     }
-                }, 100);
-            }
+                }
+            }, 100);
         }
     }
     if (avgTracklist == "On" && !url.includes('corrections.php')) {
-        if (url.includes('https://www.albumoftheyear.org/song/') || url.includes('https://www.albumoftheyear.org/album/')) {
-            if (!url.includes('/user-reviews/')) {
-                let allscores = 0
-                let ratedtrackcount = 0
-                let yourratedtrackcount = 0
-                let youravgrating = 0
-                let color2;
-                let color3;
-                if (document.getElementsByClassName('trackTitle') && url.startsWith("https://www.albumoftheyear.org/song/")) {
-                    if (document.getElementsByClassName('trackTitle')) {
-                        for (let i = 0; i < document.getElementsByClassName('trackTitle').length; i++) {
-                            let checkifrating = document.getElementsByClassName('trackTitle')[i].parentNode.children[2].children[0].className
-                            let checkifrating2 = document.getElementsByClassName('trackTitle')[i].parentNode.children[3].children[0].className
-                            if (checkifrating == "green-font" || checkifrating == "red-font" || checkifrating == "yellow-font") {
-                                allscores += Number(document.getElementsByClassName('trackTitle')[i].parentNode.children[2].children[0].textContent)
-                                ratedtrackcount++
+        function getAvgTracklist() {
+            if (url.includes('https://www.albumoftheyear.org/song/') || url.includes('https://www.albumoftheyear.org/album/')) {
+                if (!url.includes('/user-reviews/')) {
+                    let allscores = 0
+                    let ratedtrackcount = 0
+                    let yourratedtrackcount = 0
+                    let youravgrating = 0
+                    let color2;
+                    let color3;
+                    if (document.getElementsByClassName('trackTitle') && url.startsWith("https://www.albumoftheyear.org/song/")) {
+                        if (document.getElementsByClassName('trackTitle')) {
+                            for (let i = 0; i < document.getElementsByClassName('trackTitle').length; i++) {
+                                let checkifrating = document.getElementsByClassName('trackTitle')[i].parentNode.children[2].children[0].className
+                                let checkifrating2 = document.getElementsByClassName('trackTitle')[i].parentNode.children[3].children[0].className
+                                if (checkifrating == "green-font" || checkifrating == "red-font" || checkifrating == "yellow-font") {
+                                    allscores += Number(document.getElementsByClassName('trackTitle')[i].parentNode.children[2].children[0].textContent)
+                                    ratedtrackcount++
+                                }
+                                if (checkifrating2 == "green-font" || checkifrating2 == "red-font" || checkifrating2 == "yellow-font") {
+                                    youravgrating += Number(document.getElementsByClassName('trackTitle')[i].parentNode.children[3].children[0].textContent)
+                                    yourratedtrackcount++
+                                }
                             }
-                            if (checkifrating2 == "green-font" || checkifrating2 == "red-font" || checkifrating2 == "yellow-font") {
-                                youravgrating += Number(document.getElementsByClassName('trackTitle')[i].parentNode.children[3].children[0].textContent)
-                                yourratedtrackcount++
+                            let addedelm;
+                            if (!document.getElementsByClassName('totalLength')[0]) {
+                                if (document.getElementsByClassName('trackList')) {
+                                    let totalLengthChild = document.createElement('div')
+                                    totalLengthChild.innerHTML = `<div class="totalLength"></div>`
+                                    document.getElementsByClassName('trackList')[0].appendChild(totalLengthChild)
+                                    addedelm = true;
+                                }
+                            }
+                            let tracklength = document.createElement('span')
+                            tracklength.className = 'testing'
+                            let averagerating = round(allscores / ratedtrackcount, ATRound)
+                            let youraveragerating = round(youravgrating / yourratedtrackcount, ATRound)
+                            if (youraveragerating >= 69.5) {
+                                color3 = "#85ce73"
+                            }
+                            if (youraveragerating < 69.5 && youraveragerating >= 49.5) {
+                                color3 = "#f0e68c"
+                            }
+                            if (youraveragerating < 49.5) {
+                                color3 = "#d76666"
+                            }
+                            if (averagerating >= 69.5) {
+                                color2 = "#85ce73"
+                            }
+                            if (averagerating < 69.5 && averagerating >= 49.5) {
+                                color2 = "#f0e68c"
+                            }
+                            if (averagerating < 49.5) {
+                                color2 = "#d76666"
+                            }
+                            let tracklengthtxt;
+                            if (ratedtrackcount !== 0 && yourratedtrackcount !== 0) {
+                                if (addedelm !== true) {
+                                    tracklengthtxt = document.getElementsByClassName('totalLength')[0].textContent
+                                    tracklength.innerHTML = `<span style="color: white; font-weight: bold;">Your Average Rating: </span><span style="font-weight: bold; color: ${color3}; ">${youraveragerating}</span><br><span style="color: white; font-weight: bold;">Average Rating: </span><span style="font-weight: bold; color: ${color2}; ">${averagerating}</span></br>${tracklengthtxt}`
+                                }
+                                if (addedelm == true) {
+                                    tracklength.innerHTML = `<span style="color: white; font-weight: bold;">Your Average Rating: </span><span style="font-weight: bold; color: ${color3}; ">${youraveragerating}</span><br><span style="color: white; font-weight: bold;">Average Rating: </span><span style="font-weight: bold; color: ${color2}; ">${averagerating}</span></br>`
+                                }
+                            }
+                            if (ratedtrackcount !== 0 && yourratedtrackcount == 0) {
+                                if (addedelm !== true) {
+                                    tracklengthtxt = document.getElementsByClassName('totalLength')[0].textContent
+                                    tracklength.innerHTML = `<span style="color: white; font-weight: bold;">Your Average Rating: </span><span style="font-weight: bold;">N/A</span><br><span style="color: white; font-weight: bold;">Average Rating: </span><span style="font-weight: bold; color: ${color2}; ">${averagerating}</span></br>${tracklengthtxt}`
+                                }
+                                if (addedelm == true) {
+                                    tracklength.innerHTML = `<span style="color: white; font-weight: bold;">Your Average Rating: </span><span style="font-weight: bold;">N/A</span><br><span style="color: white; font-weight: bold;">Average Rating: </span><span style="font-weight: bold; color: ${color2}; ">${averagerating}</span></br>`
+                                }
+                            }
+                            if (ratedtrackcount == 0) {
+                                if (addedelm !== true) {
+                                    tracklengthtxt = document.getElementsByClassName('totalLength')[0].textContent
+                                    tracklength.innerHTML = `<span style="color: white; font-weight: bold;">Your Average Rating: </span><span style="font-weight: bold;">N/A</span><br><span style="color: white; font-weight: bold;">Average Rating: </span><span style="font-weight: bold; ">N/A</span></br>${tracklengthtxt}`
+                                }
+                                if (addedelm == true) {
+                                    tracklength.innerHTML = `<span style="color: white; font-weight: bold;">Your Average Rating: </span><span style="font-weight: bold;">N/A</span><br><span style="color: white; font-weight: bold;">Average Rating: </span><span style="font-weight: bold; ">N/A</span></br>`
+                                }
+                            }
+                            document.getElementsByClassName('totalLength')[0].innerHTML = ''
+                            document.getElementsByClassName('totalLength')[0].append(tracklength)
+                        }
+                    }
+                    if (document.getElementsByClassName('trackTitle') && onalbum == "True") {
+                        for (let i = 0; i < document.getElementsByClassName('trackTitle').length; i++) {
+                            if (document.getElementsByClassName('trackRating')[i].children[0]) {
+                                ratedtrackcount++
+                                allscores += Number(document.getElementsByClassName('trackRating')[i].children[0].textContent)
                             }
                         }
                         let addedelm;
@@ -840,22 +999,12 @@
                                 let totalLengthChild = document.createElement('div')
                                 totalLengthChild.innerHTML = `<div class="totalLength"></div>`
                                 document.getElementsByClassName('trackList')[0].appendChild(totalLengthChild)
-                                addedelm = true;
+                                addedelm = true
                             }
                         }
                         let tracklength = document.createElement('span')
                         tracklength.className = 'testing'
                         let averagerating = round(allscores / ratedtrackcount, ATRound)
-                        let youraveragerating = round(youravgrating / yourratedtrackcount, ATRound)
-                        if (youraveragerating >= 69.5) {
-                            color3 = "#85ce73"
-                        }
-                        if (youraveragerating < 69.5 && youraveragerating >= 49.5) {
-                            color3 = "#f0e68c"
-                        }
-                        if (youraveragerating < 49.5) {
-                            color3 = "#d76666"
-                        }
                         if (averagerating >= 69.5) {
                             color2 = "#85ce73"
                         }
@@ -866,78 +1015,20 @@
                             color2 = "#d76666"
                         }
                         let tracklengthtxt;
-                        if (ratedtrackcount !== 0 && yourratedtrackcount !== 0) {
-                            if (addedelm !== true) {
-                                tracklengthtxt = document.getElementsByClassName('totalLength')[0].textContent
-                                tracklength.innerHTML = `<span style="color: white; font-weight: bold;">Your Average Rating: </span><span style="font-weight: bold; color: ${color3}; ">${youraveragerating}</span><br><span style="color: white; font-weight: bold;">Average Rating: </span><span style="font-weight: bold; color: ${color2}; ">${averagerating}</span></br>${tracklengthtxt}`
-                            }
-                            if (addedelm == true) {
-                                tracklength.innerHTML = `<span style="color: white; font-weight: bold;">Your Average Rating: </span><span style="font-weight: bold; color: ${color3}; ">${youraveragerating}</span><br><span style="color: white; font-weight: bold;">Average Rating: </span><span style="font-weight: bold; color: ${color2}; ">${averagerating}</span></br>`
-                            }
+                        if (ratedtrackcount !== 0) {
+                            tracklengthtxt = document.getElementsByClassName('totalLength')[0].textContent
+                            tracklength.innerHTML = `<span style="color: white; font-weight: bold;">Average Rating: </span><span style="font-weight: bold; color: ${color2}; ">${averagerating}</span><br>${tracklengthtxt}</br>`
+                            document.getElementsByClassName('totalLength')[0].innerHTML = ''
+                            document.getElementsByClassName('totalLength')[0].append(tracklength)
                         }
-                        if (ratedtrackcount !== 0 && yourratedtrackcount == 0) {
-                            if (addedelm !== true) {
-                                tracklengthtxt = document.getElementsByClassName('totalLength')[0].textContent
-                                tracklength.innerHTML = `<span style="color: white; font-weight: bold;">Your Average Rating: </span><span style="font-weight: bold;">N/A</span><br><span style="color: white; font-weight: bold;">Average Rating: </span><span style="font-weight: bold; color: ${color2}; ">${averagerating}</span></br>${tracklengthtxt}`
-                            }
-                            if (addedelm == true) {
-                                tracklength.innerHTML = `<span style="color: white; font-weight: bold;">Your Average Rating: </span><span style="font-weight: bold;">N/A</span><br><span style="color: white; font-weight: bold;">Average Rating: </span><span style="font-weight: bold; color: ${color2}; ">${averagerating}</span></br>`
-                            }
+                        if (addedelm == true) {
+                            document.getElementsByClassName('totalLength')[0].innerHTML = document.getElementsByClassName('totalLength')[0].innerHTML.replaceAll('<br>', '').replaceAll('</br>', '')
                         }
-                        if (ratedtrackcount == 0) {
-                            if (addedelm !== true) {
-                                tracklengthtxt = document.getElementsByClassName('totalLength')[0].textContent
-                                tracklength.innerHTML = `<span style="color: white; font-weight: bold;">Your Average Rating: </span><span style="font-weight: bold;">N/A</span><br><span style="color: white; font-weight: bold;">Average Rating: </span><span style="font-weight: bold; ">N/A</span></br>${tracklengthtxt}`
-                            }
-                            if (addedelm == true) {
-                                tracklength.innerHTML = `<span style="color: white; font-weight: bold;">Your Average Rating: </span><span style="font-weight: bold;">N/A</span><br><span style="color: white; font-weight: bold;">Average Rating: </span><span style="font-weight: bold; ">N/A</span></br>`
-                            }
-                        }
-                        document.getElementsByClassName('totalLength')[0].innerHTML = ''
-                        document.getElementsByClassName('totalLength')[0].append(tracklength)
-                    }
-                }
-                if (document.getElementsByClassName('trackTitle') && onalbum == "True") {
-                    for (let i = 0; i < document.getElementsByClassName('trackTitle').length; i++) {
-                        if (document.getElementsByClassName('trackRating')[i].children[0]) {
-                            ratedtrackcount++
-                            allscores += Number(document.getElementsByClassName('trackRating')[i].children[0].textContent)
-                        }
-                    }
-                    let addedelm;
-                    if (!document.getElementsByClassName('totalLength')[0]) {
-                        if (document.getElementsByClassName('trackList')) {
-                            let totalLengthChild = document.createElement('div')
-                            totalLengthChild.innerHTML = `<div class="totalLength"></div>`
-                            document.getElementsByClassName('trackList')[0].appendChild(totalLengthChild)
-                            addedelm = true
-                        }
-                    }
-                    let tracklength = document.createElement('span')
-                    tracklength.className = 'testing'
-                    let averagerating = round(allscores / ratedtrackcount, ATRound)
-                    if (averagerating >= 69.5) {
-                        color2 = "#85ce73"
-                    }
-                    if (averagerating < 69.5 && averagerating >= 49.5) {
-                        color2 = "#f0e68c"
-                    }
-                    if (averagerating < 49.5) {
-                        color2 = "#d76666"
-                    }
-                    let tracklengthtxt;
-                    if (ratedtrackcount !== 0) {
-                        tracklengthtxt = document.getElementsByClassName('totalLength')[0].textContent
-                        tracklength.innerHTML = `<span style="color: white; font-weight: bold;">Average Rating: </span><span style="font-weight: bold; color: ${color2}; ">${averagerating}</span><br>${tracklengthtxt}</br>`
-                        document.getElementsByClassName('totalLength')[0].innerHTML = ''
-                        document.getElementsByClassName('totalLength')[0].append(tracklength)
-                    }
-                    if (addedelm == true) {
-                        document.getElementsByClassName('totalLength')[0].innerHTML = document.getElementsByClassName('totalLength')[0].innerHTML.replaceAll('<br>', '').replaceAll('</br>', '')
                     }
                 }
             }
         }
+        getAvgTracklist()
     }
     if (quickAddTag == "On") {
         if (url.startsWith('https://www.albumoftheyear.org/album') || url.startsWith('https://www.albumoftheyear.org/artist/')) {
@@ -1041,6 +1132,12 @@
                                 navigator.clipboard.writeText(link)
                             }
                         }
+                        if (el.getElementsByClassName('page_error_content').length > 0) {
+                            let rymlink = document.createElement("a");
+                            rymlink.innerHTML = `<a>Add Tracks (No RYM URL Found)</a>`
+                            document.getElementsByClassName('headline')[3].textContent = ''
+                            document.getElementsByClassName('headline')[3].appendChild(rymlink)
+                        }
                     })
             }
             if (checkUrl == "Off") {
@@ -1092,6 +1189,45 @@
 
     }
     if (betterColors == "On") {
+        if (url.startsWith('https://www.albumoftheyear.org/user/') && document.getElementsByClassName('profileStat').length > 0) {
+            for (let i = 0; i < document.getElementsByClassName('distBar').length; i++) {
+                let currentcolor
+                if (i == 0) {
+                    currentcolor = hundredcolor
+                }
+                if (i == 1) {
+                    currentcolor = nineties
+                }
+                if (i == 2) {
+                    currentcolor = eighties
+                }
+                if (i == 3) {
+                    currentcolor = seventies
+                }
+                if (i == 4) {
+                    currentcolor = sixties
+                }
+                if (i == 5) {
+                    currentcolor = fifties
+                }
+                if (i == 6) {
+                    currentcolor = fourties
+                }
+                if (i == 7) {
+                    currentcolor = thirties
+                }
+                if (i == 8) {
+                    currentcolor = twenties
+                }
+                if (i == 9) {
+                    currentcolor = tens
+                }
+                if (i == 10) {
+                    currentcolor = zero
+                }
+                document.getElementsByClassName('distBar')[i].style.backgroundColor = currentcolor
+            }
+        }
         if (document.getElementsByClassName('testing').length > 0) {
             if (document.getElementsByClassName('testing')[0].children[1].textContent !== "N/A") {
                 let score = document.getElementsByClassName('testing')[0].children[1].textContent
